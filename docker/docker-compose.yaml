@@ -1,0 +1,16 @@
+version: '3'
+services:
+  api:
+    environment:
+      - SESSION_SECRET
+      - DB_URL
+    image: 'engramapp/api'
+    ports:
+      - "3939:3939"
+  mongodb:
+    image: mongo
+    ports:
+      - "27017:27017"
+    container_name: mongodb
+    volumes:
+      - ./db/:/data/db

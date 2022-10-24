@@ -6,6 +6,11 @@
   "scripts": {
     "start": "node build/server.js",
     "build": "esbuild src/server.ts --platform=node --bundle --minify --outfile=build/server.js",
+    "docker:build": "docker build -t engramapp/api -f docker/Dockerfile .",
+    "docker:run": "docker run -p 3939:3939 engramapp/api",
+    "docker:push": "docker push engramapp/api",
+    "compose:up": "docker compose --env-file .env -f docker/docker-compose.yaml up",
+    "compose:down": "docker compose --env-file .env -f docker/docker-compose.yaml down",
     "dev": "npm run build -- --watch"
   },
   "author": "",

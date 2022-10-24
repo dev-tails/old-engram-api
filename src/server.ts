@@ -11,8 +11,13 @@ async function run() {
     throw new Error("SESSION_SECRET must be set");
   }
 
+  console.log("Attempting to connect to", config.dbUrl);
+
   const client = new MongoClient(config.dbUrl);
   await client.connect();
+
+  console.log(`Connected to: ${config.dbUrl}`);
+
   const db = client.db("engram");
   const User = db.collection("users");
 
@@ -23,14 +28,16 @@ async function run() {
 
   app.use(express.json());
 
-  app.use(session({
-    secret: config.sessionSecret,
-    resave: false,
-    saveUninitialized: false,
-    store: MongoStore.create({
-      client
+  app.use(
+    session({
+      secret: config.sessionSecret,
+      resave: false,
+      saveUninitialized: false,
+      store: MongoStore.create({
+        client,
+      }),
     })
-  }));
+  );
 
   const authOriginMiddleware = (req, res, next) => {
     res.header("Access-Control-Allow-Origin", config.authOrigin);
@@ -40,7 +47,11 @@ async function run() {
       "Origin, X-Requested-With, Content-Type, Accept"
     );
     next();
-  }
+  };
+
+  app.get("/health", (req, res) => {
+    res.sendStatus(200);
+  });
 
   app.options("/u/*", authOriginMiddleware, (req, res) => {
     res.sendStatus(200);
@@ -117,8 +128,8 @@ async function run() {
         return res.sendStatus(400);
       }
       res.sendStatus(200);
-    })
-  })
+    });
+  });
 
   const blockOriginMiddleware = (req, res, next) => {
     if (config.blockOrigins.includes(req.headers.origin || "")) {
@@ -130,7 +141,7 @@ async function run() {
       );
     }
     next();
-  }
+  };
 
   app.options("/blocks", blockOriginMiddleware, (req, res) => {
     res.sendStatus(200);
@@ -159,15 +170,27 @@ async function run() {
       });
     }
 
-    await Block.insertOne({ 
+    await Block.insertOne({
       ...value,
-      user: new ObjectId(user)
+      user: new ObjectId(user),
     });
     res.sendStatus(200);
-  })
+  });
 
-  app.listen(config.port);
+  const server = app.listen(config.port);
   console.log("Server started on port", config.port);
+
+  process.on("SIGTERM", () => {
+    console.log("SIGTERM signal received.");
+
+    server.close(async () => {
+      console.log("Server closed");
+
+      console.log("Closing mongo connection");
+      await client.close();
+      console.log("Mongo connection closed");
+    });
+  });
 }
 
 run();
