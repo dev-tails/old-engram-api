@@ -33,7 +33,8 @@ async function run() {
       secret: config.sessionSecret,
       resave: false,
       cookie: {
-        sameSite: "none"
+        sameSite: "none",
+        secure: true
       },
       saveUninitialized: false,
       store: MongoStore.create({
