@@ -193,6 +193,10 @@ async function run() {
     next();
   };
 
+  app.options("/analytics-events", analyticsOriginMiddleware, (req, res) => {
+    res.sendStatus(200);
+  });
+
   app.post("/analytics-events", analyticsOriginMiddleware, async (req, res) => {
     const analyticsEventSchema = Joi.object<{
       type: string;
