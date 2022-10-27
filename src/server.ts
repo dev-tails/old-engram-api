@@ -20,6 +20,7 @@ async function run() {
 
   const db = client.db("engram");
   const User = db.collection("users");
+  const AnalyticsEvent = db.collection("analyticsevents");
 
   // TODO: migrate notes to blocks
   const Block = db.collection("notes");
@@ -32,6 +33,10 @@ async function run() {
     session({
       secret: config.sessionSecret,
       resave: false,
+      cookie: {
+        sameSite: "none",
+        secure: true
+      },
       saveUninitialized: false,
       store: MongoStore.create({
         client,
@@ -174,6 +179,37 @@ async function run() {
       ...value,
       user: new ObjectId(user),
     });
+    res.sendStatus(200);
+  });
+
+  const analyticsOriginMiddleware = (req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Origin, X-Requested-With, Content-Type, Accept"
+    );
+
+    next();
+  };
+
+  app.post("/analytics-events", analyticsOriginMiddleware, async (req, res) => {
+    const analyticsEventSchema = Joi.object<{
+      type: string;
+      data: any;
+    }>({
+      type: Joi.string(),
+      data: Joi.object(),
+    });
+
+    const { value, error } = analyticsEventSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        error,
+      });
+    }
+
+    await AnalyticsEvent.insertOne(value);
     res.sendStatus(200);
   });
 
