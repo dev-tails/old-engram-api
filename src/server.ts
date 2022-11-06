@@ -5,44 +5,41 @@ import bcryptjs from "bcryptjs";
 import { config } from "./config";
 import session from "express-session";
 import MongoStore from "connect-mongo";
+import { Client } from "../../database/client/src/Client";
 
 async function run() {
   if (!config.sessionSecret) {
     throw new Error("SESSION_SECRET must be set");
   }
 
-  console.log("Attempting to connect to", config.dbUrl);
-
-  const client = new MongoClient(config.dbUrl);
-  await client.connect();
-
+  const client = new Client(config.dbUrl);
+  const db = await client.connect();
   console.log(`Connected to: ${config.dbUrl}`);
 
-  const db = client.db("engram");
-  const User = db.collection("users");
-  const AnalyticsEvent = db.collection("analyticsevents");
+  const User = db.User;
+  // const AnalyticsEvent = db.collection("analyticsevents");
 
   // TODO: migrate notes to blocks
-  const Block = db.collection("notes");
+  const Block = db.Note;
 
   const app = express();
 
   app.use(express.json());
 
-  app.use(
-    session({
-      secret: config.sessionSecret,
-      resave: false,
-      cookie: {
-        sameSite: "none",
-        secure: true
-      },
-      saveUninitialized: false,
-      store: MongoStore.create({
-        client,
-      }),
-    })
-  );
+  // app.use(
+  //   session({
+  //     secret: config.sessionSecret,
+  //     resave: false,
+  //     cookie: {
+  //       sameSite: "none",
+  //       secure: true
+  //     },
+  //     saveUninitialized: false,
+  //     store: MongoStore.create({
+  //       client,
+  //     }),
+  //   })
+  // );
 
   const authOriginMiddleware = (req, res, next) => {
     res.header("Access-Control-Allow-Origin", config.authOrigin);
@@ -177,7 +174,7 @@ async function run() {
 
     await Block.insertOne({
       ...value,
-      user: new ObjectId(user),
+      user,
     });
     res.sendStatus(200);
   });
@@ -197,25 +194,25 @@ async function run() {
     res.sendStatus(200);
   });
 
-  app.post("/analytics-events", analyticsOriginMiddleware, async (req, res) => {
-    const analyticsEventSchema = Joi.object<{
-      type: string;
-      data: any;
-    }>({
-      type: Joi.string(),
-      data: Joi.object(),
-    });
+  // app.post("/analytics-events", analyticsOriginMiddleware, async (req, res) => {
+  //   const analyticsEventSchema = Joi.object<{
+  //     type: string;
+  //     data: any;
+  //   }>({
+  //     type: Joi.string(),
+  //     data: Joi.object(),
+  //   });
 
-    const { value, error } = analyticsEventSchema.validate(req.body);
-    if (error) {
-      return res.status(400).json({
-        error,
-      });
-    }
+  //   const { value, error } = analyticsEventSchema.validate(req.body);
+  //   if (error) {
+  //     return res.status(400).json({
+  //       error,
+  //     });
+  //   }
 
-    await AnalyticsEvent.insertOne(value);
-    res.sendStatus(200);
-  });
+  //   await AnalyticsEvent.insertOne(value);
+  //   res.sendStatus(200);
+  // });
 
   const server = app.listen(config.port);
   console.log("Server started on port", config.port);
