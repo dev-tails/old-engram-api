@@ -1,10 +1,7 @@
 import express from "express";
 import Joi from "joi";
-import { MongoClient, ObjectId } from "mongodb";
 import bcryptjs from "bcryptjs";
 import { config } from "./config";
-import session from "express-session";
-import MongoStore from "connect-mongo";
 import { Client } from "../../database/client/src/Client";
 
 async function run() {
@@ -25,21 +22,6 @@ async function run() {
   const app = express();
 
   app.use(express.json());
-
-  // app.use(
-  //   session({
-  //     secret: config.sessionSecret,
-  //     resave: false,
-  //     cookie: {
-  //       sameSite: "none",
-  //       secure: true
-  //     },
-  //     saveUninitialized: false,
-  //     store: MongoStore.create({
-  //       client,
-  //     }),
-  //   })
-  // );
 
   const authOriginMiddleware = (req, res, next) => {
     res.header("Access-Control-Allow-Origin", config.authOrigin);
@@ -86,7 +68,8 @@ async function run() {
       email: value.email,
       password: hashedPassword,
     });
-    (req.session as any).user = String(insertedId);
+    
+    res.cookie("session", String(insertedId));
 
     res.sendStatus(200);
   });
@@ -117,7 +100,8 @@ async function run() {
       user.password
     );
     if (passwordsMatch) {
-      (req.session as any).user = String(user._id);
+      res.cookie("session", user._id);
+
       return res.sendStatus(200);
     } else {
       return res.sendStatus(400);
@@ -125,74 +109,70 @@ async function run() {
   });
 
   app.get("/u/logout", (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        return res.sendStatus(400);
-      }
-      res.sendStatus(200);
-    });
+    // TODO: delete session in DB
+    res.cookie("session", null)
   });
 
-  const blockOriginMiddleware = (req, res, next) => {
-    if (config.blockOrigins.includes(req.headers.origin || "")) {
-      res.header("Access-Control-Allow-Origin", req.headers.origin);
-      res.header("Access-Control-Allow-Credentials", "true");
-      res.header(
-        "Access-Control-Allow-Headers",
-        "Origin, X-Requested-With, Content-Type, Accept"
-      );
-    }
-    next();
-  };
+  // const blockOriginMiddleware = (req, res, next) => {
+  //   if (config.blockOrigins.includes(req.headers.origin || "")) {
+  //     res.header("Access-Control-Allow-Origin", req.headers.origin);
+  //     res.header("Access-Control-Allow-Credentials", "true");
+  //     res.header(
+  //       "Access-Control-Allow-Headers",
+  //       "Origin, X-Requested-With, Content-Type, Accept"
+  //     );
+  //   }
+  //   next();
+  // };
 
-  app.options("/blocks", blockOriginMiddleware, (req, res) => {
-    res.sendStatus(200);
-  });
+  // app.options("/blocks", blockOriginMiddleware, (req, res) => {
+  //   res.sendStatus(200);
+  // });
 
-  app.post("/blocks", blockOriginMiddleware, async (req, res) => {
-    const { user } = req.session as any;
-    if (!user) {
-      return res.sendStatus(400);
-    }
+  // app.post("/blocks", blockOriginMiddleware, async (req, res) => {
+  //   const { user } = req.session as any;
+  //   if (!user) {
+  //     return res.sendStatus(400);
+  //   }
 
-    const blockSchema = Joi.object<{
-      createdAt: Date;
-      localId: string;
-      body: string | undefined;
-    }>({
-      createdAt: Joi.date(),
-      localId: Joi.string().required(),
-      body: Joi.string(),
-    });
+  //   const blockSchema = Joi.object<{
+  //     createdAt: Date;
+  //     localId: string;
+  //     body: string | undefined;
+  //   }>({
+  //     createdAt: Joi.date(),
+  //     localId: Joi.string().required(),
+  //     body: Joi.string(),
+  //   });
 
-    const { value, error } = blockSchema.validate(req.body);
-    if (error) {
-      return res.status(400).json({
-        error,
-      });
-    }
+  //   const { value, error } = blockSchema.validate(req.body);
+  //   if (error) {
+  //     return res.status(400).json({
+  //       error,
+  //     });
+  //   }
 
-    await Block.insertOne({
-      ...value,
-      user,
-    });
-    res.sendStatus(200);
-  });
+  //   await Block.insertOne({
+  //     ...value,
+  //     user,
+  //   });
+  //   res.sendStatus(200);
+  // });
 
-  const analyticsOriginMiddleware = (req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Credentials", "true");
-    res.header(
-      "Access-Control-Allow-Headers",
-      "Origin, X-Requested-With, Content-Type, Accept"
-    );
+  // const analyticsOriginMiddleware = (req, res, next) => {
+  //   res.header("Access-Control-Allow-Origin", "*");
+  //   res.header("Access-Control-Allow-Credentials", "true");
+  //   res.header(
+  //     "Access-Control-Allow-Headers",
+  //     "Origin, X-Requested-With, Content-Type, Accept"
+  //   );
 
-    next();
-  };
+  //   next();
+  // };
 
-  app.options("/analytics-events", analyticsOriginMiddleware, (req, res) => {
-    res.sendStatus(200);
-  });
+  // app.options("/analytics-events", analyticsOriginMiddleware, (req, res) => {
+  //   res.sendStatus(200);
+  // });
 
   // app.post("/analytics-events", analyticsOriginMiddleware, async (req, res) => {
   //   const analyticsEventSchema = Joi.object<{
